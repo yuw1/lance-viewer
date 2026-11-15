@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-11-15T06:20:56Z",
+  "lance": {
+    "tag": null,
+    "commit": null
+  },
+  "python_protobuf": "7.35.1",
+  "sources": null,
+  "bindings": {
+    "ann_pb2.py": "sha256:6094d8199694b248fc5c7db892d59f77992f526189eb1f83dad1cf4fd93656ed",
+    "cache_diagnostics_pb2.py": "sha256:10ec0495bc077ad35920314fe4fd2740dfb4bed2a38b68bcfdeabae6cef0ea31",
+    "clustering_pb2.py": "sha256:a01b19ffbf3ab8eda69a10df268d5bd73929ed40e988f28851de9dcac100d0ab",
+    "encodings_v2_0_pb2.py": "sha256:531c0a828dc60568cdf89403536c482bf30f106c0bc2659410c5663ec0b98eeb",
+    "encodings_v2_1_pb2.py": "sha256:a173760d0fae7b7e648296ed7e458ffdac82450d9d79d805020cc0a3b280f05f",
+    "encodings_v2_3_pb2.py": "sha256:8a0274d3b97a51f836408d15e499bfe140ddcf16d30f26beb5cc4790c0b28b8c",
+    "file2_pb2.py": "sha256:59ce98fad9afdf406f3e1dcaad6751f5e4ad79b86910a16cca5f78b14cbea301",
+    "file_pb2.py": "sha256:6bd3d14ea88b89c2603ff9090659b7e5390dec5aec1700cab31eb0aa5e7ef370",
+    "filtered_read_pb2.py": "sha256:4942bc3dbe7b40f24290092517dd276acf324bd848297e3425577cbcb4efd01e",
+    "fragment_metadata_pb2.py": "sha256:ec702df736537e4fad3cb909f75dd0a6b9150118b6b7632365744ad23769b7d5",
+    "index_old_pb2.py": "sha256:a070dc2505f65ce8727f186969aba4f5373253fba6941b4ded3acd0feafa6475",
+    "index_pb2.py": "sha256:0417ac6cfdb4387a0acaac5b5de1b13bf1844141980665db7772117051b5bed6",
+    "rowids_pb2.py": "sha256:56e4b92220ad8820102deae1a0242c05c4fc1a8fb3aa065de39c9fe803c777c0",
+    "table_identifier_pb2.py": "sha256:66a6bcf4819c24effd08794f1c916a0c163531c2e4950728a3e8cc40f1c28844",
+    "table_pb2.py": "sha256:a7554a491dfb6a1d6c9a2bf7cfda4ecd9066530b7a74ead6ba95515f37c7a138",
+    "transaction_pb2.py": "sha256:83336b90e5d8ef4dff1783e44561b810cc960ab815293ec3969ec29b6272343f"
+  }
+}

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package + dev deps
+        run: |
+          pip install -e ".[dev]"
+
+      - name: Generate demo dataset (tests depend on examples/demo.lance, which is gitignored)
+        run: |
+          python scripts/create_test_table.py --no-register --rows 200 --vec-dim 64
+
+      - name: Run tests
+        run: |
+          pytest -q
+
+  # A non-editable install is what users actually get, and it is the only build where a missing
+  # package-data glob shows up. Build the artifact, inspect it, then serve the UI from it.
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel
+
+      - name: Every runtime asset must be in the wheel
+        run: |
+          python scripts/check_wheel.py dist/*.whl
+
+      - name: Install it and serve the UI from the installed package
+        run: |
+          python -m pip install dist/*.whl
+          cd /tmp
+          python -m lance_viewer.server --port 8788 &
+          SERVER_PID=$!
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8788/ > /dev/null && break
+            sleep 1
+          done
+          for path in / /favicon.ico /favicon.svg /apple-touch-icon.png /css/style.css /js/render.js; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8788$path")
+            echo "$path -> $code"
+            test "$code" = 200
+          done
+          kill $SERVER_PID
+
+  # Deliberately narrow rule set (see [tool.ruff.lint] in pyproject.toml): it catches code that
+  # cannot work — undefined names, broken comparisons, syntax errors — not style.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install ruff
+        run: |
+          python -m pip install ruff
+
+      - name: Lint
+        run: |
+          ruff check src tests scripts

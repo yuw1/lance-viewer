@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lance Viewer</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Lance Viewer</h1>
+  <span class="tag" data-i18n="appSubtitle">Lance 数据集浏览器</span>
+  <div id="curPath" class="tag" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title=""></div>
+  <button id="langToggle" class="btn-mini" onclick="toggleLang()" style="margin-left:auto">English</button>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <h2 data-i18n="dsTitle" data-icon="database">数据集</h2>
+      <button class="btn-mini" id="dsAdd" data-i18n="dsAdd" data-icon="plus">添加</button>
+    </div>
+    <ul class="ds-list" id="dsList"></ul>
+  </aside>
+
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" data-tab="tree" data-i18n="tab_tree">文件树</div>
+      <div class="tab" data-tab="schema" data-i18n="tab_schema">表结构</div>
+      <div class="tab" data-tab="index" data-i18n="tab_index">索引</div>
+      <div class="tab" data-tab="diff" data-i18n="tab_diff">版本对比</div>
+      <div class="tab" data-tab="storage" data-i18n="tab_storage">存储分析</div>
+      <div class="tab" data-tab="health" data-i18n="tab_health">健康检查</div>
+      <div class="tab" data-tab="timeline" data-i18n="tab_timeline">事务时间线</div>
+      <div class="tab" data-tab="data" data-i18n="tab_data">文件内容</div>
+    </div>
+    <div class="container">
+      <div id="error" class="error" style="display:none"></div>
+      <div id="view"></div>
+      <div id="loading" class="loading" style="display:none">
+        <span class="spinner"></span><span data-i18n="loading">正在读取…</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 数据集 新增/编辑 modal -->
+<div id="dsModal" class="modal" style="display:none">
+  <div class="modal-box ds-modal">
+    <div class="modal-head">
+      <div class="modal-title" id="dsModalTitle" data-i18n="dsModalAdd">添加数据集</div>
+      <button class="modal-close" onclick="toggleDsModal(false)" title="close">
+        <svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="ds-modal-body">
+      <input id="dsId" type="hidden">
+      <label class="ds-label"><span data-i18n="dsNameLabel">数据集名称</span> <span class="ds-opt" data-i18n="dsNameOpt">(可选，留空自动取路径末段)</span></label>
+      <input id="dsName" type="text" placeholder="Demo">
+
+      <label class="ds-label"><span data-i18n="dsPathLabel">数据集路径</span> <span class="ds-req">*</span></label>
+      <input id="dsPath" type="text" placeholder="local-dir / s3://bucket/path" style="font-family:ui-monospace,monospace">
+
+      <!-- Connection params (always shown; stored as storage_options on submit) -->
+      <div id="dsStorageSec" class="ds-storage">
+        <div class="ds-sec-title" data-i18n="dsStorageTitle">连接参数（对象存储用）</div>
+        <div class="ds-field" style="margin-bottom:10px">
+          <label class="ds-label">storage type</label>
+          <select id="dsStoreType" style="font-family:ui-monospace,monospace;background:#0b0d12;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px">
+            <option value="s3">s3</option>
+            <option value="oss">oss</option>
+          </select>
+        </div>
+        <div class="ds-grid">
+          <div class="ds-field">
+            <label class="ds-label" id="dsEndpointLabel">endpoint</label>
+            <input id="dsEndpoint" type="text" placeholder="https://your-endpoint.example.com" style="font-family:ui-monospace,monospace">
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" id="dsRegionLabel">region</label>
+            <input id="dsRegion" type="text" placeholder="us-east-1" style="font-family:ui-monospace,monospace">
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" id="dsAkLabel">access_key_id</label>
+            <input id="dsAk" type="text" placeholder="AKIA..." style="font-family:ui-monospace,monospace">
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" id="dsSkLabel">secret_access_key</label>
+            <input id="dsSk" type="password" placeholder="••••••••" style="font-family:ui-monospace,monospace">
+          </div>
+        </div>
+      </div>
+
+      <div id="dsAdvSec" class="ds-adv">
+        <details>
+          <summary class="ds-adv-toggle" data-i18n="dsAdvToggle">高级：额外连接参数（可选）</summary>
+          <div id="dsKvRows" class="ds-kv"></div>
+          <button id="dsKvAdd" class="btn-mini ds-kv-add" type="button" data-i18n="dsKvAdd">添加参数</button>
+        </details>
+      </div>
+
+      <div class="ds-form-row">
+        <button id="dsSave" data-i18n="save">保存</button>
+        <button id="dsCancel" class="btn-plain" data-i18n="cancel">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manifest 查看器 modal -->
+<div id="manifestModal" class="modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Manifest 内容 <span id="mfFile" class="mono" style="color:var(--violet)"></span></div>
+      <button class="modal-close" onclick="closeManifest()" title="close">
+        <svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div id="mfSummary" class="mf-summary"></div>
+    <div id="mfBody" class="mf-body"></div>
+  </div>
+</div>
+
+<footer data-i18n="footer">Lance Viewer · pylance 驱动</footer>
+
+<script src="js/icons.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/files.js"></script>
+<script src="js/render.js"></script>
+<script src="js/sidebar.js"></script>
+</body>
+</html>

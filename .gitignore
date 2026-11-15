@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+.pytest_cache/
+
+# Lance Viewer runtime
+# Demo dataset (contains generated data; not committed)
+examples/
+# Local dataset registry SQLite
+datasets.db
+
+# Tools / editors
+.idea/
+.vscode/
+*.log
+.DS_Store

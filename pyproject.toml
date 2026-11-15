@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lance-viewer"
+version = "0.1.0"
+description = "Private Lance dataset Web viewer - browse the internals of any Lance dataset (local files or S3/object storage)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+authors = [{ name = "Lance Viewer contributors" }]
+keywords = ["lance", "lakehouse", "data-viewer", "arrow", "protobuf"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+    "Environment :: Web Environment",
+]
+dependencies = [
+    "protobuf>=4",
+    "opendal",   # object-storage reads (s3/oss): file + range reads
+    "pyarrow",   # Arrow IPC deletion files (_deletions/*.arrow) and Arrow tables
+    "pylance",   # opens datasets to read table content (Data tab)
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff"]
+# Only needed by scripts/regen_protos.py (it bundles protoc); the runtime imports protobuf alone.
+proto = ["grpcio-tools>=1.60"]
+
+[project.scripts]
+lance-viewer = "lance_viewer.server:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+lance_viewer = [
+    "static/index.html",
+    "static/*.ico",
+    "static/*.svg",
+    "static/*.png",
+    "static/css/*.css",
+    "static/js/*.js",
+    "protos/*.py",
+    "protos/*.desc",
+    "protos/*.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py39"
+# Generated protobuf code is an artifact, not source: never lint it.
+extend-exclude = ["src/lance_viewer/protos"]
+
+[tool.ruff.lint]
+# Deliberately narrow: catch code that cannot work (syntax errors, undefined names, broken
+# comparisons) rather than style. Widen only after the baseline stays clean under this set.
+select = ["E9", "F63", "F7", "F82"]
