@@ -5,10 +5,10 @@ Depends on app.util (pure helpers), app.lance_client (pylance client), app.confi
 import os
 from datetime import datetime, timezone
 
-from .config import lance, ipc, LANCE_AVAILABLE, PYARROW_AVAILABLE
+from .config import lance, ipc, pa, LANCE_AVAILABLE, PYARROW_AVAILABLE
 from .lance_client import open_dataset, is_cloud, storage_option_set, storage_options
 from .session_store import open_cached
-from .util import (fmt_timestamp, num, cell_to_py, sanitize_index_stat,
+from .util import (fmt_timestamp, num, cell_to_py, json_safe_value, sanitize_index_stat,
                    schema_field_set, collect_files, categorize)
 from .manifest_decoder import decode_manifest_file, build_summary, decode_txn_file, build_txn_summary
 from .datafile_decoder import decode_datafile
@@ -49,10 +49,10 @@ def _preview_cell(value):
         py = value
     if isinstance(py, (list, tuple)):
         # Vector/list columns: send full values (plain numbers, formatted by the frontend)
-        return [float(x) if isinstance(x, (int, float)) else x for x in py]
+        return [float(x) if isinstance(x, (int, float)) else json_safe_value(x) for x in py]
     if isinstance(py, float):
         return round(py, 6)
-    return py
+    return json_safe_value(py)
 
 
 def dataset_info(path, limit=200, offset=0, version=None, include_refs=False, session=None,
@@ -109,8 +109,11 @@ def dataset_info(path, limit=200, offset=0, version=None, include_refs=False, se
     display_cols = []
     for col in tbl.column_names:
         arr = tbl.column(col)
+        # Real timestamp columns are flagged by Arrow type, so the flag is right even when the first
+        # row is null; plain integer columns holding epoch values still use the range heuristic.
+        is_ts = pa is not None and pa.types.is_timestamp(arr.type)
         sample = arr[0].as_py() if arr.length() else None
-        display_cols.append({"name": col, "timestamp": fmt_timestamp(sample) is not None})
+        display_cols.append({"name": col, "timestamp": is_ts or fmt_timestamp(sample) is not None})
 
     info = {
         "path": path,

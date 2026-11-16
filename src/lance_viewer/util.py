@@ -1,5 +1,32 @@
 """Pure helper functions: timestamp formatting / numbers / Arrow scalar to JSON / index-stat folding / file collection and categorization."""
-from datetime import datetime, timezone
+from datetime import datetime, date, time, timedelta, timezone
+from decimal import Decimal
+
+
+def json_safe_value(py):
+    """Make a value from Arrow's as_py() acceptable to json.dumps.
+
+    Arrow scalars surface as datetime/date/time/timedelta/Decimal/bytes, none of which the stdlib
+    JSON encoder knows — returning them raw closes the HTTP connection mid-response. Timestamps
+    become epoch milliseconds so the frontend's existing `new Date(ms)` rendering applies; the rest
+    become readable strings/numbers. datetime is checked before date because it subclasses date.
+    """
+    if isinstance(py, datetime):
+        # Arrow timestamps without a timezone are UTC by convention.
+        if py.tzinfo is None:
+            py = py.replace(tzinfo=timezone.utc)
+        return int(py.timestamp() * 1000)
+    if isinstance(py, date):
+        return py.isoformat()
+    if isinstance(py, time):
+        return py.isoformat()
+    if isinstance(py, timedelta):
+        return str(py)
+    if isinstance(py, Decimal):
+        return float(py)
+    if isinstance(py, (bytes, bytearray)):
+        return py.decode("utf-8", "replace")
+    return py
 
 
 def fmt_timestamp(v):
@@ -34,10 +61,10 @@ def cell_to_py(value):
         if n > 8:
             preview = ", ".join(num(py[i]) for i in range(4))
             return {"__vector__": True, "dims": n, "preview": f"[{preview}, ...]"}
-        return py
+        return [json_safe_value(x) for x in py]
     if isinstance(py, float):
         return round(py, 6)
-    return py
+    return json_safe_value(py)
 
 
 def sanitize_index_stat(stats):
