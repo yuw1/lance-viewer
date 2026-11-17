@@ -679,6 +679,13 @@ function setLang(lang) {
   document.documentElement.lang = currentLang === 'en' ? 'en' : 'zh-CN';
   const btn = $('langToggle');
   if (btn) btn.textContent = currentLang === 'en' ? '中文' : 'English';
+  // The tab body is generated HTML (no data-i18n markers), so re-render it to follow the new
+  // language when a dataset is open. loadCurrentTab is declared in sidebar.js, which loads after
+  // this file; `currentPath` truthiness plus the typeof guard keep the boot-time setLang() call
+  // (run before anything is loaded) from touching it.
+  if (currentPath && typeof loadCurrentTab === 'function') {
+    loadCurrentTab();
+  }
 }
 
 function toggleLang() { setLang(currentLang === 'en' ? 'zh' : 'en'); }
