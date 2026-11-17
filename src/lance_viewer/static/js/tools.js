@@ -205,6 +205,7 @@ const I18N = {
     issue_fragment_skew: 'fragment 大小不均：最大约为中位数的 {ratio} 倍',
     issue_version_churn: '{versions} 个版本累计写入约 {ratio} 倍当前行数，历史版本占用较大',
     issue_no_vector_index: '向量列 {field} 没有索引',
+    issue_vector_partitions: '向量索引 {index} 平均每个分区 {rows_per_partition} 个向量（{indexed_rows} 行 / {partitions} 个分区），超过 {threshold} 的上限，建议优化或重建索引以增加分区数',
     // refs bar / data
     branchLabel: '分支',
     versionLabel: '版本/标签',
@@ -488,6 +489,7 @@ const I18N = {
     issue_fragment_skew: 'Fragments are uneven: the largest is about {ratio}x the median',
     issue_version_churn: '{versions} versions wrote about {ratio}x the current row count; history is large',
     issue_no_vector_index: 'Vector column {field} has no index',
+    issue_vector_partitions: 'Vector index {index} averages {rows_per_partition} vectors per partition ({indexed_rows} rows / {partitions} partitions), over the {threshold} target — optimize or rebuild the index to increase its partition count',
     // refs bar / data
     branchLabel: 'Branch',
     versionLabel: 'Version/Tag',

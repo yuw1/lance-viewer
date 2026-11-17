@@ -177,7 +177,9 @@ check('health: column names, types and index badges', () => {
     size_bytes: 10, deleted_rows: 0, fragment_stats: { min: 1, median: 1, max: 1 },
     format: { data_storage_version: TAG },
     coverage: [{ field: TAG, type: ATTR, index_types: [ATTR] }],
-    issues: [{ code: 'tombstones', severity: 'warn', params: { rows: 1, pct: 10 } }],
+    issues: [{ code: 'tombstones', severity: 'warn', params: { rows: 1, pct: 10 } },
+             { code: 'vector_partitions', severity: 'warn',
+               params: { index: TAG, rows_per_partition: 9, indexed_rows: 9, partitions: 1, threshold: 10000 } }],
   });
   assertNoLeak(view(), 'health');
 });

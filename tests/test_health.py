@@ -112,3 +112,91 @@ def test_version_churn_is_reported_for_a_heavily_appended_dataset(tmp_path):
     assert churn["severity"] == "info"
     assert churn["params"]["versions"] == 21
     assert churn["params"]["ratio"] >= 3
+
+# ---------- vector index partition health ----------
+
+def test_vector_partition_issue_flags_a_lopsided_ivf_index():
+    issue = handlers._vector_partition_issue("idx_hnsw", {
+        "num_indexed_rows": 30_000,
+        "indices": [{"num_partitions": 2}],
+    })
+    assert issue is not None
+    assert issue["code"] == "vector_partitions"
+    assert issue["severity"] == "warn"
+    assert issue["params"] == {
+        "index": "idx_hnsw",
+        "rows_per_partition": 15_000,
+        "indexed_rows": 30_000,
+        "partitions": 2,
+        "threshold": handlers.HEALTH_MAX_ROWS_PER_PARTITION,
+    }
+
+
+def test_vector_partition_issue_is_quiet_when_balanced():
+    assert handlers._vector_partition_issue("idx", {
+        "num_indexed_rows": 10_000, "indices": [{"num_partitions": 4}],
+    }) is None
+
+
+def test_vector_partition_issue_sums_partitions_across_segments():
+    issue = handlers._vector_partition_issue("idx", {
+        "num_indexed_rows": 60_000,
+        "indices": [{"num_partitions": 2}, {"num_partitions": 3}],
+    })
+    assert issue is not None
+    assert issue["params"]["partitions"] == 5
+    assert issue["params"]["rows_per_partition"] == 12_000
+
+
+def test_vector_partition_issue_ignores_missing_stat_fields():
+    for stats in ({}, {"num_indexed_rows": 0}, {"num_indexed_rows": 10, "indices": [{"num_partitions": 0}]}):
+        assert handlers._vector_partition_issue("idx", stats) is None
+
+
+def test_health_info_emits_the_partition_finding(health_dataset, monkeypatch):
+    """Only IVF indices are checked; the finding is threaded into the issues list."""
+    calls = []
+
+    def fake_describe(ds):
+        return [{"name": "vec_idx", "type": "IVF_HNSW_FLAT", "fields": ["vec"]},
+                {"name": "btree_idx", "type": "BTree", "fields": ["name"]}]
+
+    def fake_stats(ds, name):
+        calls.append(name)
+        return {"num_indexed_rows": 30_000, "indices": [{"num_partitions": 2}]}
+
+    monkeypatch.setattr(handlers, "_describe_indices", fake_describe)
+    monkeypatch.setattr(handlers, "_index_stats", fake_stats)
+
+    info, err = handlers.health_info(str(health_dataset))
+    assert err is None, err
+
+    codes = {i["code"] for i in info["issues"]}
+    assert "vector_partitions" in codes
+    finding = next(i for i in info["issues"] if i["code"] == "vector_partitions")
+    assert finding["params"]["index"] == "vec_idx"
+    assert finding["params"]["rows_per_partition"] == 15_000
+    # Stats were fetched for the IVF index only, never the BTree.
+    assert calls == ["vec_idx"]
+
+
+def test_vector_partition_issue_at_production_scale():
+    """A large table built into a single partition: rows-per-partition dwarfs the threshold."""
+    issue = handlers._vector_partition_issue("idx_vec", {
+        "num_indexed_rows": 10_000_000,
+        "indices": [{"num_partitions": 1}],
+    })
+    assert issue is not None
+    assert issue["params"]["rows_per_partition"] == 10_000_000
+    assert issue["params"]["partitions"] == 1
+    # Exactly three orders of magnitude past the threshold: decisively "too few partitions".
+    assert issue["params"]["rows_per_partition"] >= 1000 * issue["params"]["threshold"]
+
+
+def test_healthy_sqrt_scale_partitioning_is_not_flagged():
+    """A large table partitioned at ~sqrt(n) stays comfortably under the threshold."""
+    issue = handlers._vector_partition_issue("idx_vec", {
+        "num_indexed_rows": 10_000_000,
+        "indices": [{"num_partitions": 3_200}],
+    })
+    assert issue is None

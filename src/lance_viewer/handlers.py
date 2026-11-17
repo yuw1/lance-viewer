@@ -633,6 +633,18 @@ def storage_info(path):
 
 
 HEALTH_SMALL_FRAGMENT_ROWS = 10_000
+# An IVF partition should hold roughly this many vectors or fewer; past it, each probe scans too
+# wide a group and query latency climbs. Lance's own guidance lands near sqrt(n) partitions, which
+# keeps rows-per-partition close to sqrt(n) — for the sizes this tool is used on, a flat 10k cap is
+# a conservative "definitely too few partitions" line.
+HEALTH_MAX_ROWS_PER_PARTITION = 10_000
+
+# The IVF family groups vectors by centroid, so rows-per-partition is meaningful for these only.
+# HNSW/FLAT/Inverted/BTree have no such grouping and are skipped.
+IVF_INDEX_TYPES = {
+    "IVF_FLAT", "IVF_PQ", "IVF_SQ",
+    "IVF_HNSW_FLAT", "IVF_HNSW_SQ", "IVF_HNSW_PQ",
+}
 
 
 def _index_stats(ds, name):
@@ -652,6 +664,47 @@ def _describe_indices(ds):
     return [{"name": idx.get("name"), "type": idx.get("type"),
              "fields": [str(f) for f in (idx.get("fields") or [])]}
             for idx in ds.list_indices() or []]
+
+
+def _vector_partition_issue(name, stats):
+    """Flag an IVF index whose vectors-per-partition exceeds the healthy target.
+
+    Returns an issue dict, or None when the index is fine or the stats do not carry the needed
+    fields. Threads the actual number through so the UI can show "30000 rows / 2 partitions =
+    15000 per partition" instead of a bare verdict.
+    """
+    if not isinstance(stats, dict):
+        return None
+    indexed_rows = int(stats.get("num_indexed_rows") or 0)
+    if not indexed_rows:
+        return None
+
+    entries = stats.get("indices") or []
+    if entries:
+        # Each entry is a segment of the index; sum its partitions so a multi-segment index is
+        # judged on its total.
+        partitions = sum(int(e.get("num_partitions") or 0)
+                         for e in entries if isinstance(e, dict))
+    else:
+        partitions = int(stats.get("num_partitions") or 0)
+    if not partitions:
+        return None
+
+    rows_per_partition = indexed_rows / partitions
+    if rows_per_partition <= HEALTH_MAX_ROWS_PER_PARTITION:
+        return None
+
+    return {
+        "code": "vector_partitions",
+        "severity": "warn",
+        "params": {
+            "index": name,
+            "rows_per_partition": int(rows_per_partition),
+            "indexed_rows": indexed_rows,
+            "partitions": partitions,
+            "threshold": HEALTH_MAX_ROWS_PER_PARTITION,
+        },
+    }
 
 
 def health_info(path, session=None):
@@ -742,6 +795,17 @@ def health_info(path, session=None):
                 field["name"] in i["fields"] for i in indices):
             issues.append({"code": "no_vector_index", "severity": "info",
                            "params": {"field": field["name"]}})
+
+    for idx in indices:
+        if idx["type"] not in IVF_INDEX_TYPES:
+            continue
+        try:
+            stats = _index_stats(ds, idx["name"])
+        except Exception:
+            continue   # a stats hiccup must not sink the whole health tab
+        issue = _vector_partition_issue(idx["name"], stats)
+        if issue:
+            issues.append(issue)
 
     severity_order = {"error": 0, "warn": 1, "info": 2}
     issues.sort(key=lambda issue: severity_order.get(issue["severity"], 3))
